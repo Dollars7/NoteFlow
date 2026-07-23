@@ -88,9 +88,13 @@ The answer becomes a smaller retrieval card in the same card pool. It is not add
 
 NoteFlow uses a Cloudflare D1 binding named `DB`.
 
-- `workspace_state` is the durable source of truth for the current goal profile, notes/cards, memory state, and retrieval evidence.
-- The browser `localStorage` copy is only an offline cache and migration fallback.
-- The current MVP stores one local workspace snapshot. Authentication and multi-user workspace isolation are intentionally not implemented yet.
+- Production routes require dispatch-owned Sign in with ChatGPT.
+- `workspace_state` stores one independent snapshot per authenticated user.
+- The server derives a SHA-256 storage key from the forwarded authenticated email; the client never supplies an owner id.
+- Every API read and write rejects anonymous requests and can only address the current user’s row.
+- The browser `localStorage` copy is namespaced per account and remains an offline cache, not the source of truth.
+- Local development uses an explicit `local@noteflow.dev` identity so the app stays usable without weakening production authentication.
+- The legacy device cache is migrated once into the new account-scoped local cache.
 - The API creates the table defensively for local development; the generated migration is in `drizzle/0000_gigantic_blade.sql`.
 
 ## Scheduling objective

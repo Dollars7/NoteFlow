@@ -2112,3 +2112,88 @@ input[type="checkbox"] {
     padding: 20px;
   }
 }
+
+
+.header-tools,
+.account-pill,
+.account-copy {
+  align-items: center;
+  display: flex;
+}
+
+.header-tools {
+  gap: 12px;
+}
+
+.account-pill {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  gap: 9px;
+  min-height: 42px;
+  padding: 4px 7px 4px 5px;
+}
+
+.account-avatar {
+  align-items: center;
+  background: var(--lime-soft);
+  border: 1px solid rgba(204, 255, 120, 0.18);
+  border-radius: 8px;
+  color: var(--lime);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  height: 31px;
+  justify-content: center;
+  width: 31px;
+}
+
+.account-copy {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 150px;
+}
+
+.account-copy strong,
+.account-copy small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-copy strong {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.account-copy small {
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.account-pill > a {
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+  margin-left: 3px;
+  padding: 5px 3px 5px 9px;
+  text-decoration: none;
+}
+
+.account-pill > a:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .account-copy,
+  .data-status {
+    display: none;
+  }
+
+  .account-pill {
+    padding-right: 5px;
+  }
+}
