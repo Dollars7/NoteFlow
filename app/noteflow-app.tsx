@@ -46,9 +46,16 @@ type StoredMemory = {
 const legacyStorageKey = "noteflow-memory-v2";
 
 type NoteFlowUser = {
+  id: string;
   displayName: string;
   email: string;
-  isLocal: boolean;
+  authProvider: string;
+};
+
+type NoteFlowAppProps = {
+  user: NoteFlowUser;
+  getAccessToken: () => Promise<string | null>;
+  onSignOut: () => Promise<void>;
 };
 
 function richText(line: string): ReactNode[] {
@@ -106,7 +113,7 @@ function SkillStateView({
           <p className="eyebrow">{eyebrow}</p>
           <h2>{title}</h2>
         </div>
-        <span className="local-pill"><i /> 只保存在本机</span>
+        <span className="local-pill"><i /> 保存到私人空间</span>
       </div>
       <div className="state-grid">
         {skills.map((skill) => {
@@ -172,8 +179,13 @@ function buildPrerequisiteCard(source: NoteCard): NoteCard {
   };
 }
 
-export default function NoteFlowApp({ user }: { user: NoteFlowUser }) {
-  const storageKey = `noteflow-memory-v3:${user.email.trim().toLowerCase()}`;
+export default function NoteFlowApp({
+  user,
+  getAccessToken,
+  onSignOut,
+}: NoteFlowAppProps) {
+  const storageKey = `noteflow-memory-v4:${user.id}`;
+  const legacyAccountStorageKey = `noteflow-memory-v3:${user.email.trim().toLowerCase()}`;
   const [phase, setPhase] = useState<Phase>("pre");
   const [workspaceView, setWorkspaceView] = useState<"notes" | "learn">("learn");
   const [goalProfile, setGoalProfile] = useState<GoalProfile>(defaultGoalProfile);
@@ -252,23 +264,33 @@ export default function NoteFlowApp({ user }: { user: NoteFlowUser }) {
         let parsed: StoredMemory | null = null;
 
         try {
-          const response = await fetch("/api/state", { headers: { accept: "application/json" } });
-          if (response.ok) {
-            const payload = (await response.json()) as { state: StoredMemory | null };
-            parsed = payload.state;
+          const accessToken = await getAccessToken();
+          if (accessToken) {
+            const response = await fetch("/api/state", {
+              headers: {
+                accept: "application/json",
+                authorization: `Bearer ${accessToken}`,
+              },
+            });
+            if (response.ok) {
+              const payload = (await response.json()) as { state: StoredMemory | null };
+              parsed = payload.state;
+            }
           }
         } catch {
-          // The local D1 server may be unavailable while offline.
+          // The D1-backed private workspace may be unavailable while offline.
         }
 
         if (!parsed) {
           try {
             const saved =
               window.localStorage.getItem(storageKey) ??
+              window.localStorage.getItem(legacyAccountStorageKey) ??
               window.localStorage.getItem(legacyStorageKey);
             if (saved) parsed = JSON.parse(saved) as StoredMemory;
           } catch {
             window.localStorage.removeItem(storageKey);
+            window.localStorage.removeItem(legacyAccountStorageKey);
             window.localStorage.removeItem(legacyStorageKey);
           }
         }
@@ -279,7 +301,7 @@ export default function NoteFlowApp({ user }: { user: NoteFlowUser }) {
     });
 
     return () => window.cancelAnimationFrame(restoreFrame);
-  }, [storageKey]);
+  }, [getAccessToken, legacyAccountStorageKey, storageKey]);
 
   useEffect(() => {
     if (!hasRestored) return;
@@ -296,18 +318,26 @@ export default function NoteFlowApp({ user }: { user: NoteFlowUser }) {
 
     const saveTimer = window.setTimeout(() => {
       window.localStorage.setItem(storageKey, JSON.stringify(stored));
+      window.localStorage.removeItem(legacyAccountStorageKey);
       window.localStorage.removeItem(legacyStorageKey);
-      void fetch("/api/state", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(stored),
-      }).catch(() => {
+      void (async () => {
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+        await fetch("/api/state", {
+          method: "PUT",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(stored),
+        });
+      })().catch(() => {
         // localStorage remains an offline cache; D1 is retried on the next change.
       });
     }, 350);
 
     return () => window.clearTimeout(saveTimer);
-  }, [cardMemory, deletedCardIds, evidence, generatedCards, generatedNotes, goalProfile, hasRestored, skills, storageKey]);
+  }, [cardMemory, deletedCardIds, evidence, generatedCards, generatedNotes, getAccessToken, goalProfile, hasRestored, legacyAccountStorageKey, skills, storageKey]);
 
   const clearRecording = () => {
     if (mediaRecorder.current?.state === "recording") mediaRecorder.current.stop();
@@ -687,7 +717,7 @@ ${gapSentence.trim()}
           <div className="header-tools">
             <div className="data-status">
               <i />
-              <span>个人空间 · 自动保存</span>
+              <span>个人空间 · 云端自动保存</span>
               {phase === "post" && workspaceView === "learn" && (
                 <button className="quiet-button" type="button" onClick={resetMemory}>重置学习数据</button>
               )}
@@ -698,11 +728,15 @@ ${gapSentence.trim()}
               </span>
               <span className="account-copy">
                 <strong>{user.displayName}</strong>
-                <small>{user.isLocal ? "本地开发身份" : user.email}</small>
+                <small>{user.authProvider === "google" ? `Google · ${user.email}` : user.email}</small>
               </span>
-              {!user.isLocal && (
-                <a href="/signout-with-chatgpt?return_to=%2F">退出</a>
-              )}
+              <button
+                className="account-signout"
+                type="button"
+                onClick={() => void onSignOut()}
+              >
+                退出
+              </button>
             </div>
           </div>
         )}

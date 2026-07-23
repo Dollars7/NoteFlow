@@ -1,4 +1,4 @@
-import { getChatGPTUser } from "../../chatgpt-auth";
+import { authenticateRequest } from "../../../lib/supabase-auth";
 
 async function ensureWorkspaceTable(db: D1Database) {
   await db
@@ -18,26 +18,14 @@ function getDatabase() {
   return runtime.__NOTEFLOW_DB__;
 }
 
-async function storageKeyFor(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(normalizedEmail),
-  );
-  const hash = [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  return `user:${hash}`;
+async function authenticatedStorageKey(request: Request) {
+  const user = await authenticateRequest(request);
+  return user ? `supabase:${user.id}` : null;
 }
 
-async function authenticatedStorageKey() {
-  const user = await getChatGPTUser();
-  return user ? storageKeyFor(user.email) : null;
-}
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const workspaceId = await authenticatedStorageKey();
+    const workspaceId = await authenticatedStorageKey(request);
     if (!workspaceId) {
       return Response.json({ state: null, error: "Authentication required." }, { status: 401 });
     }
@@ -58,7 +46,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const workspaceId = await authenticatedStorageKey();
+    const workspaceId = await authenticatedStorageKey(request);
     if (!workspaceId) {
       return Response.json({ saved: false, error: "Authentication required." }, { status: 401 });
     }

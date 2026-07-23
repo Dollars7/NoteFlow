@@ -84,18 +84,26 @@ An empty note back asks:
 
 The answer becomes a smaller retrieval card in the same card pool. It is not added to a task list. A card skipped repeatedly is silently marked for decomposition, treating poor card design as a system problem rather than a learner failure.
 
-## Database
+## Authentication and database
 
-NoteFlow uses a Cloudflare D1 binding named `DB`.
+NoteFlow supports two sign-in paths through Supabase Auth:
 
-- Production routes require dispatch-owned Sign in with ChatGPT.
-- `workspace_state` stores one independent snapshot per authenticated user.
-- The server derives a SHA-256 storage key from the forwarded authenticated email; the client never supplies an owner id.
-- Every API read and write rejects anonymous requests and can only address the current user’s row.
-- The browser `localStorage` copy is namespaced per account and remains an offline cache, not the source of truth.
-- Local development uses an explicit `local@noteflow.dev` identity so the app stays usable without weakening production authentication.
-- The legacy device cache is migrated once into the new account-scoped local cache.
-- The API creates the table defensively for local development; the generated migration is in `drizzle/0000_gigantic_blade.sql`.
+- **Google OAuth** for one-click sign-in
+- **Email numeric OTP** with no password to create or remember
+
+Authentication and product storage are deliberately separate:
+
+- Supabase Auth owns identity, sessions, and the stable authenticated user ID.
+- Cloudflare D1 owns notes, goals, Skill State, card memory, and learning evidence.
+- `workspace_state` stores one independent JSON snapshot per verified Supabase user ID.
+- The browser sends the current Supabase access token; `/api/state` verifies it with Supabase before choosing a D1 row.
+- The client never supplies a workspace owner ID, and anonymous or invalid-token requests receive `401`.
+- Browser `localStorage` is namespaced by the stable user ID and acts only as an offline cache.
+- Recordings remain session-local. Imported CSV/TSV files are parsed in the browser; only the resulting knowledge objects are saved.
+
+The D1 schema does not need a new table for authentication. Existing knowledge state remains one object with multiple views, not separate note and flashcard databases.
+
+Full provider setup is documented in [`docs/AUTH_SETUP.md`](docs/AUTH_SETUP.md).
 
 ## Scheduling objective
 
@@ -111,6 +119,10 @@ Hidden retrieval priority =
 ```
 
 The priority is never shown before retrieval.
+
+## Authentication setup
+
+Copy `.env.example` to `.env.local`, add the Supabase Project URL and Publishable Key, then follow [`docs/AUTH_SETUP.md`](docs/AUTH_SETUP.md) to enable Google and the `{{ .Token }}` email template.
 
 ## Run locally
 
@@ -129,11 +141,13 @@ pnpm exec tsc --noEmit
 
 ## Core files
 
-- `app/page.tsx` — workspace navigation, session boundaries, commit gate, recording, and feedback
+- `app/auth-gate.tsx` — Google OAuth, email OTP, session restoration, and sign-out
+- `app/noteflow-app.tsx` — workspace navigation, session boundaries, commit gate, recording, and feedback
+- `lib/supabase-auth.ts` — server-side bearer-token verification
 - `app/note-library.tsx` — editable objects, import preview, tags, and batch management
 - `lib/import-notes.ts` — NoteFlow CSV and Anki CSV/TSV parser
 - `app/goal-planner.tsx` — custom goal, scope, and interview sprint controls
-- `app/api/state/route.ts` — D1-backed state API
+- `app/api/state/route.ts` — authenticated, per-user D1 state API
 - `lib/flow-engine.ts` — retention-first ranking, focus boundaries, sprint urgency, and silent Skip
 - `db/schema.ts` — D1 schema
 - `tests/rendered-html.test.mjs` — production-render and product-constraint regressions

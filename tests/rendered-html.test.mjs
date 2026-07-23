@@ -4,6 +4,11 @@ import test from "node:test";
 
 let loadedWorker;
 
+const testAuthEnv = {
+  NEXT_PUBLIC_SUPABASE_URL: "https://noteflow-test.supabase.co",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_noteflow_test",
+};
+
 function createFakeDb() {
   const rows = new Map();
 
@@ -38,7 +43,7 @@ function createFakeDb() {
   };
 }
 
-async function dispatch(request, db = createFakeDb()) {
+async function dispatch(request, db = createFakeDb(), env = {}) {
   if (!loadedWorker) {
     const workerUrl = new URL("../dist/server/index.js", import.meta.url);
     workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -52,6 +57,7 @@ async function dispatch(request, db = createFakeDb()) {
         fetch: async () => new Response("Not found", { status: 404 }),
       },
       DB: db,
+      ...env,
     },
     {
       waitUntil() {},
@@ -60,77 +66,108 @@ async function dispatch(request, db = createFakeDb()) {
   );
 }
 
-async function render() {
-  return dispatch(
-    new Request("http://localhost/", {
-      headers: {
-        accept: "text/html",
-        "oai-authenticated-user-email": "alice@example.com",
-      },
-    }),
-  );
+function installSupabaseUserMock() {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    const url = new URL(request.url);
+    if (url.origin === testAuthEnv.NEXT_PUBLIC_SUPABASE_URL && url.pathname === "/auth/v1/user") {
+      const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+      const users = {
+        "token-alice": { id: "user-alice", email: "alice@example.com" },
+        "token-bob": { id: "user-bob", email: "bob@example.com" },
+      };
+      const user = users[token];
+      if (!user) return Response.json({ message: "Invalid JWT" }, { status: 401 });
+      return Response.json({
+        ...user,
+        aud: "authenticated",
+        role: "authenticated",
+        app_metadata: { provider: "email", providers: ["email"] },
+        user_metadata: {},
+        identities: [],
+        created_at: "2026-07-23T00:00:00.000Z",
+      });
+    }
+    return originalFetch(input, init);
+  };
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
 }
 
-test("server-renders an authenticated private workspace without leaking an answer", async () => {
+async function render() {
+  return dispatch(new Request("http://localhost/", { headers: { accept: "text/html" } }));
+}
+
+test("server-renders the private-account setup gate without leaking product data", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<title>NoteFlow/);
-  assert.match(html, /System handles the decision/);
-  assert.match(html, /当前能力状态/);
-  assert.match(html, /开始本次学习/);
-  assert.match(html, /笔记库/);
-  assert.match(html, /最近要学什么/);
-  assert.match(html, /面试冲刺/);
-  assert.match(html, /这次只学哪些知识/);
-  assert.match(html, /alice@example\.com/);
-  assert.match(html, /个人空间/);
+  assert.match(html, /继续你的 Flow/);
+  assert.match(html, /使用 Google 继续/);
+  assert.match(html, /发送验证码/);
+  assert.match(html, /NEXT_PUBLIC_SUPABASE_URL/);
+  assert.match(html, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
   assert.doesNotMatch(html, /Min-heap invariant|Overlap invariant/);
   assert.doesNotMatch(html, /Decision receipt|Today(?:.|&#x27;|’s Flow)/i);
 });
 
-test("isolates D1 workspace state by authenticated identity", async () => {
+test("isolates D1 workspace state by verified Supabase user id", async () => {
+  const restoreFetch = installSupabaseUserMock();
   const db = createFakeDb();
-  const requestFor = (email, method = "GET", body) =>
+  const requestFor = (token, method = "GET", body) =>
     new Request("http://localhost/api/state", {
       method,
       headers: {
+        authorization: `Bearer ${token}`,
         "content-type": "application/json",
-        "oai-authenticated-user-email": email,
       },
       body,
     });
 
-  const aliceWrite = await dispatch(
-    requestFor("alice@example.com", "PUT", JSON.stringify({ owner: "alice" })),
-    db,
-  );
-  const bobWrite = await dispatch(
-    requestFor("bob@example.com", "PUT", JSON.stringify({ owner: "bob" })),
-    db,
-  );
-  assert.equal(aliceWrite.status, 200);
-  assert.equal(bobWrite.status, 200);
+  try {
+    const aliceWrite = await dispatch(
+      requestFor("token-alice", "PUT", JSON.stringify({ owner: "alice" })),
+      db,
+      testAuthEnv,
+    );
+    const bobWrite = await dispatch(
+      requestFor("token-bob", "PUT", JSON.stringify({ owner: "bob" })),
+      db,
+      testAuthEnv,
+    );
+    assert.equal(aliceWrite.status, 200);
+    assert.equal(bobWrite.status, 200);
 
-  const aliceRead = await dispatch(requestFor("alice@example.com"), db);
-  const bobRead = await dispatch(requestFor("bob@example.com"), db);
-  assert.deepEqual(await aliceRead.json(), { state: { owner: "alice" } });
-  assert.deepEqual(await bobRead.json(), { state: { owner: "bob" } });
+    const aliceRead = await dispatch(requestFor("token-alice"), db, testAuthEnv);
+    const bobRead = await dispatch(requestFor("token-bob"), db, testAuthEnv);
+    assert.deepEqual(await aliceRead.json(), { state: { owner: "alice" } });
+    assert.deepEqual(await bobRead.json(), { state: { owner: "bob" } });
 
-  const anonymous = await dispatch(
-    new Request("http://localhost/api/state", { headers: { accept: "application/json" } }),
-    db,
-  );
-  assert.equal(anonymous.status, 401);
+    const invalid = await dispatch(requestFor("invalid-token"), db, testAuthEnv);
+    assert.equal(invalid.status, 401);
+
+    const anonymous = await dispatch(
+      new Request("http://localhost/api/state", { headers: { accept: "application/json" } }),
+      db,
+      testAuthEnv,
+    );
+    assert.equal(anonymous.status, 401);
+  } finally {
+    restoreFetch();
+  }
 });
 
-test("implements unified notes, scoped scheduling, and authenticated persistence", async () => {
+test("implements dual auth, unified notes, scoped scheduling, and private persistence", async () => {
   const [
     serverPage,
+    authGate,
+    serverAuth,
     clientApp,
-    auth,
     engine,
     noteLibrary,
     importer,
@@ -140,8 +177,9 @@ test("implements unified notes, scoped scheduling, and authenticated persistence
     packageJson,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/auth-gate.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/supabase-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/noteflow-app.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/chatgpt-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/flow-engine.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/note-library.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/import-notes.ts", import.meta.url), "utf8"),
@@ -151,8 +189,17 @@ test("implements unified notes, scoped scheduling, and authenticated persistence
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(serverPage, /requireChatGPTUser/);
-  assert.match(auth, /oai-authenticated-user-email/);
+  assert.match(serverPage, /AuthGate/);
+  assert.match(authGate, /signInWithOAuth/);
+  assert.match(authGate, /provider: "google"/);
+  assert.match(authGate, /signInWithOtp/);
+  assert.match(authGate, /verifyOtp/);
+  assert.match(authGate, /type: "email"/);
+  assert.match(authGate, /使用 Google 继续/);
+  assert.match(authGate, /发送验证码/);
+  assert.match(serverAuth, /auth\.getUser\(token\)/);
+  assert.match(serverAuth, /persistSession: false/);
+
   assert.match(engine, /type NoteCard/);
   assert.match(engine, /tags: string\[\]/);
   assert.match(engine, /focusSkillIds/);
@@ -165,8 +212,8 @@ test("implements unified notes, scoped scheduling, and authenticated persistence
   assert.match(clientApp, /MediaRecorder/);
   assert.match(clientApp, /刚才卡在哪一句/);
   assert.match(clientApp, /是否继续不会进入调度权重/);
-  assert.match(clientApp, /fetch\("\/api\/state"/);
-  assert.match(clientApp, /noteflow-memory-v3/);
+  assert.match(clientApp, /authorization: `Bearer \$\{accessToken\}`/);
+  assert.match(clientApp, /noteflow-memory-v4/);
   assert.match(clientApp, /deletedCardIds/);
   assert.match(clientApp, /bulkAddTag/);
 
@@ -177,8 +224,8 @@ test("implements unified notes, scoped scheduling, and authenticated persistence
   assert.match(importer, /front.*back.*tags/i);
   assert.match(importer, /parseRows/);
 
-  assert.match(apiRoute, /storageKeyFor/);
-  assert.match(apiRoute, /SHA-256/);
+  assert.match(apiRoute, /`supabase:\$\{user\.id\}`/);
+  assert.match(apiRoute, /authenticateRequest\(request\)/);
   assert.match(apiRoute, /Authentication required/);
   assert.match(apiRoute, /ON CONFLICT\(id\) DO UPDATE/);
   assert.doesNotMatch(apiRoute, /workspaceId = "default"/);
@@ -190,6 +237,8 @@ test("implements unified notes, scoped scheduling, and authenticated persistence
 
   assert.doesNotMatch(clientApp, /availableMinutes|completedIds|Decision receipt/);
   assert.doesNotMatch(engine, /sessionLength|willingnessToContinue/);
+  assert.match(packageJson, /@supabase\/supabase-js/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  await assert.rejects(access(new URL("../app/chatgpt-auth.ts", import.meta.url)));
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });
