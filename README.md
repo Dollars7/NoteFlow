@@ -1,260 +1,137 @@
-# NoteFlow
+# NoteFlow — Retention-first learning
 
-**NoteFlow** is a local-first, waterfall-style learning notebook designed for low-friction knowledge browsing.
+> **The system carries decision cost. The learner carries retrieval cost.**
 
-Instead of imitating a social platform, NoteFlow reframes fragmented learning content into an **attention-friendly card feed**: quick to scan, easy to revisit, and structured for people who benefit from lower activation energy when starting study sessions.
+NoteFlow is a note product and a learning conductor. The note and the learning card are not separate systems; they are two views of the same knowledge object:
 
----
+- **Front:** a retrieval prompt that requires an attempt
+- **Back:** the editable Markdown note used to compare, repair, and deepen the answer
 
-## Concept
+The app now has two explicit workspaces:
 
-NoteFlow turns mixed content sources into a masonry-style notebook experience.
+- **笔记库:** create, search, import, tag, batch-manage, and edit the knowledge objects
+- **学习:** choose a strategic goal boundary, then let the Flow Engine decide which object appears next
 
-Typical inputs can include:
+## Note format and bulk import
 
-* RSS articles
-* local Markdown notes
-* JSON content seeds
-* images and rich media metadata
-* AI-generated summaries, tags, and card copy
+Every knowledge object has a required knowledge area (`skillId`) and a tag list:
 
-Typical outputs are:
+- **Knowledge area:** one scheduling domain such as Intervals, Object Design, Spring / JWT, or Graphs
+- **Tags:** zero or more free-form labels such as `heap`, `interview`, or `java`
+- **Retrieval mode:** recall, solve, design, or speak
+- **Front / back:** retrieval prompt and Markdown note
 
-* a multi-column waterfall feed
-* concise study cards
-* tag-based filtering
-* detail pages with source content + transformed summaries
-* an optional AI-assisted content transformation pipeline
+The library accepts:
 
----
+- NoteFlow CSV with `title,prompt,noteMarkdown,skill,tags,mode,hintKeywords,scaffold`
+- Anki CSV/TSV with `Front,Back,Tags`
+- Anki-style headerless TSV ordered as Front, Back, Tags
 
-## Product Goal
+Imports are previewed before saving. Unknown Deck or skill names are routed to a user-selected fallback area. Search results can be selected in bulk, moved to another area, tagged, or deleted. Deletion also removes the associated memory evidence and persists a tombstone for built-in objects.
 
-Build a **local content browser for learning**, not a social app.
+## Goals, focus, and interview sprints
 
-Core principles:
+Before a session, the learner can:
 
-* **local-first**: runs with local data and simple storage
-* **attention-friendly**: card-based layout reduces reading resistance
-* **transformable**: raw content can be rewritten into study-friendly cards
-* **browseable**: encourages lightweight review through a visual feed
+- name a current goal, such as “Amazon SDE II technical interview”
+- choose a role baseline
+- switch between steady learning and interview sprint mode
+- provide an interview date
+- restrict the session to selected knowledge areas
 
----
+The knowledge-area selection is a hard scheduling boundary, not a task list. Sprint mode raises the weight of goal-relevant gaps as the interview approaches, but the objective remains memory retention. Session length and willingness to continue never enter the ranking model.
 
-## Why this exists
+## Product contract
 
-A lot of learning material is technically useful but ergonomically bad:
+- Nothing is “unfinished.” Cards not seen in a session simply return to the scheduling pool.
+- No backlog, completion rate, overdue count, priority score, or visible queue is shown.
+- Skip only moves a card to the end of the current in-memory session queue.
+- Skip never changes the memory interval and never survives as a next-day obligation.
+- Skip counts remain silent. Repeated skipping marks the card as needing decomposition.
+- The answer side is inaccessible until the learner commits to an attempt.
+- Numbers, timers, scores, and Skill State are hidden during retrieval.
+- Reaction time is recorded automatically but never shown during the problem.
+- Skill State appears only at session boundaries.
+- Choosing whether to continue never enters the ranking model.
 
-* too long
-* too dense
-* poorly structured
-* hard to re-open
-* unpleasant to casually revisit
-
-NoteFlow is meant to reduce that friction by presenting knowledge in a format that feels closer to a visual notebook than a file system.
-
----
-
-## MVP Scope
-
-### Feed
-
-* responsive 2-column to multi-column masonry layout
-* card-based rendering with variable heights
-* title, summary, tags, source, timestamp
-* optional cover image or fallback visual block
-
-### Detail View
-
-* full content page for each note
-* original source metadata
-* transformed summary and key points
-* related tags / similar notes
-
-### Content Ingestion
-
-* local JSON seeds
-* local Markdown files
-* RSS feeds
-
-### Search and Filtering
-
-* keyword search
-* filter by tag
-* filter by source type
-
-### Storage
-
-* SQLite for notes and metadata
-* local file storage for media references
-
-### AI Assist (phase 2)
-
-* title generation
-* summary generation
-* tag extraction
-* study-point extraction
-
----
-
-## Proposed Tech Stack
-
-### Frontend
-
-* Next.js
-* React
-* Tailwind CSS
-
-### Data / Storage
-
-* SQLite
-* Prisma
-
-### Ingestion
-
-* RSS parser
-* local file scanner for Markdown / JSON
-
-### AI Layer
-
-* Ollama or external LLM API
-
----
-
-## Suggested Project Structure
+## Retrieval loop
 
 ```text
-noteflow/
-├── app/
-│   ├── page.tsx                  # home feed
-│   ├── note/[id]/page.tsx        # note detail page
-│   ├── search/page.tsx           # search / filter page
-│   └── layout.tsx                # app shell
-├── components/
-│   ├── note-card.tsx             # masonry card
-│   ├── masonry-feed.tsx          # feed layout wrapper
-│   ├── search-bar.tsx            # top search
-│   ├── tag-chip.tsx              # tag UI
-│   └── top-nav.tsx               # header
-├── lib/
-│   ├── db.ts                     # database helpers
-│   ├── ingest-rss.ts             # rss ingestion
-│   ├── ingest-markdown.ts        # markdown ingestion
-│   ├── transform-note.ts         # summary/tag generation
-│   └── scoring.ts                # feed scoring logic
-├── data/
-│   ├── seeds/                    # local json note seeds
-│   └── uploads/                  # local media references
-├── prisma/
-│   └── schema.prisma
-├── public/
-│   └── placeholders/
-├── scripts/
-│   ├── seed.ts                   # insert starter content
-│   ├── import-rss.ts             # run rss sync
-│   └── transform.ts              # run AI transforms
-├── README.md
-└── package.json
+Prompt
+  → learner commits: fluent / stuck
+  → keyword cue
+  → another retrieval attempt
+  → scaffold cue if needed
+  → another retrieval attempt
+  → Markdown note back
+  → memory feedback
+  → post-retrieval delta
 ```
 
----
+The three memory signals are:
 
-## Initial Data Model
+- **I knew what I was looking for** → normal rescheduling
+- **I had no direction** → retrieve a prerequisite first
+- **This was overlearned** → expand the interval
 
-### Note
+This is not a difficulty rating. It tells the memory scheduler what kind of failure or success occurred.
 
-* id
-* title
-* summary
-* content
-* sourceType
-* sourceUrl
-* coverImage
-* createdAt
-* updatedAt
-* score
+## Notes repair themselves
 
-### Tag
+An empty note back asks:
 
-* id
-* name
+> 刚才卡在哪一句？
 
-### NoteTag
+The answer becomes a smaller retrieval card in the same card pool. It is not added to a task list. A card skipped repeatedly is silently marked for decomposition, treating poor card design as a system problem rather than a learner failure.
 
-* noteId
-* tagId
+## Database
 
-### Asset
+NoteFlow uses a Cloudflare D1 binding named `DB`.
 
-* id
-* noteId
-* filePath
-* type
+- `workspace_state` is the durable source of truth for the current goal profile, notes/cards, memory state, and retrieval evidence.
+- The browser `localStorage` copy is only an offline cache and migration fallback.
+- The current MVP stores one local workspace snapshot. Authentication and multi-user workspace isolation are intentionally not implemented yet.
+- The API creates the table defensively for local development; the generated migration is in `drizzle/0000_gigantic_blade.sql`.
 
----
+## Scheduling objective
 
-## First Development Milestone
+```text
+Hidden retrieval priority =
+  retention need
+  + goal relevance
+  + mastery gap
+  + dependency value
+  + uncertainty reduction
+  + sprint urgency when enabled
+  - familiarity discount
+```
 
-### Version 0.1
+The priority is never shown before retrieval.
 
-Goal: make it feel like a product immediately.
+## Run locally
 
-Deliverables:
+```bash
+pnpm install
+pnpm dev
+```
 
-* app shell
-* top navigation
-* masonry feed
-* 10 mock notes
-* note card component
-* detail page
+## Validate
 
-This version does **not** need:
+```bash
+pnpm test
+pnpm lint
+pnpm exec tsc --noEmit
+```
 
-* authentication
-* comments
-* user accounts
-* social graph
-* complex recommendation systems
+## Core files
 
----
+- `app/page.tsx` — workspace navigation, session boundaries, commit gate, recording, and feedback
+- `app/note-library.tsx` — editable objects, import preview, tags, and batch management
+- `lib/import-notes.ts` — NoteFlow CSV and Anki CSV/TSV parser
+- `app/goal-planner.tsx` — custom goal, scope, and interview sprint controls
+- `app/api/state/route.ts` — D1-backed state API
+- `lib/flow-engine.ts` — retention-first ranking, focus boundaries, sprint urgency, and silent Skip
+- `db/schema.ts` — D1 schema
+- `tests/rendered-html.test.mjs` — production-render and product-constraint regressions
 
-## Design Direction
-
-Visual tone:
-
-* clean
-* lightweight
-* notebook-like
-* calm but modern
-
-Interaction goals:
-
-* low cognitive load
-* easy scanning
-* visually varied cards
-* strong readability
-
----
-
-## Possible Future Directions
-
-* reading history
-* saved collections
-* semantic search
-* clustering by topic
-* spaced review mode
-* AI study coach overlays
-* source-to-card batch conversion pipeline
-
----
-
-## Positioning Statement
-
-> NoteFlow is a waterfall-style learning notebook that transforms fragmented content into a more browseable, attention-friendly study experience.
-
----
-
-## Resume-Friendly Description
-
-Built a local-first learning content browser with a responsive masonry feed, structured note cards, source ingestion from RSS and Markdown, and an AI-assisted transformation pipeline for summaries and tags.
-
+> **Don’t plan. Retrieve. Remember.**
