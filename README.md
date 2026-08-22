@@ -10,9 +10,9 @@ NoteFlow is a note product and a learning conductor. The note and the learning c
 ## Repository branches
 
 - **`main` (this branch):** the stable NoteFlow product foundation—note management, retrieval-first learning, goal controls, authentication, D1 persistence, and the deterministic Flow Engine.
-- **[`codex/all-things-agentic-hackathon`](https://github.com/Dollars7/NoteFlow/tree/codex/all-things-agentic-hackathon):** the separate 2026 All Things Agentic Hackathon entry, with the bilingual public judging flow, Gemini 3.5 Flash, Google ADK, Cloud Run, Firestore, Pub/Sub, and a direct Agent-to-practice handoff.
+- **[`Dollars7/NoteFlow-Agent-Hackathon-2026`](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026):** the standalone 2026 All Things Agentic Hackathon repository, with the bilingual public judging flow, Gemini 3.5 Flash, Google ADK, Cloud Run, Firestore, Pub/Sub, and a direct Agent-to-practice handoff.
 
-The branch boundary preserves the earlier product history and keeps contest-period claims auditable. The hackathon branch includes its own [judge README](https://github.com/Dollars7/NoteFlow/blob/codex/all-things-agentic-hackathon/README.md), [pre-existing work disclosure](https://github.com/Dollars7/NoteFlow/blob/codex/all-things-agentic-hackathon/HACKATHON_DISCLOSURE.md), and [dated development log](https://github.com/Dollars7/NoteFlow/blob/codex/all-things-agentic-hackathon/HACKATHON_DEVLOG.md).
+The repository boundary preserves the earlier product history and keeps contest-period claims auditable. The standalone submission repository includes its own [judge README](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/README.md), [pre-existing work disclosure](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/HACKATHON_DISCLOSURE.md), and [dated development log](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/HACKATHON_DEVLOG.md).
 
 The app now has two explicit workspaces:
 
