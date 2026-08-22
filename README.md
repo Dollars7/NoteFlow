@@ -7,12 +7,36 @@ NoteFlow is a note product and a learning conductor. The note and the learning c
 - **Front:** a retrieval prompt that requires an attempt
 - **Back:** the editable Markdown note used to compare, repair, and deepen the answer
 
-## Repository branches
+## Product generations and repositories
 
-- **`main` (this branch):** the stable NoteFlow product foundation—note management, retrieval-first learning, goal controls, authentication, D1 persistence, and the deterministic Flow Engine.
-- **[`Dollars7/NoteFlow-Agent-Hackathon-2026`](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026):** the standalone 2026 All Things Agentic Hackathon repository, with the bilingual public judging flow, Gemini 3.5 Flash, Google ADK, Cloud Run, Firestore, Pub/Sub, and a direct Agent-to-practice handoff.
+### Original NoteFlow — this repository
 
-The repository boundary preserves the earlier product history and keeps contest-period claims auditable. The standalone submission repository includes its own [judge README](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/README.md), [pre-existing work disclosure](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/HACKATHON_DISCLOSURE.md), and [dated development log](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/HACKATHON_DEVLOG.md).
+`main` is the stable retrieval-learning foundation:
+
+- note creation, import, search, tags, and editing;
+- retrieval cards backed by editable Markdown notes;
+- deterministic memory scheduling and prerequisite repair;
+- goal boundaries, interview sprint controls, authentication, and D1 persistence;
+- the distraction-free NoteFlow session—the learning “flow” that decides what to retrieve next.
+
+This version is intentionally user-started. It manages knowledge and retrieval well, but it does not yet learn a person's daily rhythm, schedule notifications, or revise a personal study plan through a cloud Agent.
+
+### NoteFlow Agent — hackathon repository
+
+[`Dollars7/NoteFlow-Agent-Hackathon-2026`](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026) is the separate 2026 All Things Agentic Hackathon project. Its product direction adds a personal learning-rhythm partner around the original retrieval foundation:
+
+```text
+Goal + self-described learning context
+  → adaptive rhythm
+  → opt-in notification
+  → original NoteFlow retrieval flow
+  → real memory feedback
+  → Agent revises the future rhythm
+```
+
+The Flow Engine continues to decide **what to retrieve**. The Agent is intended to decide **when to invite learning, how much load to propose, and how the rhythm should adapt** from preferences, constraints, available time, energy patterns, and actual retrieval evidence.
+
+The hackathon repository clearly separates its [intended product loop from currently implemented work](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/README.md). It also contains the [pre-existing work disclosure](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/HACKATHON_DISCLOSURE.md) and [dated development log](https://github.com/Dollars7/NoteFlow-Agent-Hackathon-2026/blob/main/HACKATHON_DEVLOG.md).
 
 The app now has two explicit workspaces:
 
