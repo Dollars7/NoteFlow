@@ -7,6 +7,13 @@ NoteFlow is a note product and a learning conductor. The note and the learning c
 - **Front:** a retrieval prompt that requires an attempt
 - **Back:** the editable Markdown note used to compare, repair, and deepen the answer
 
+## Repository branches
+
+- **`main` (this branch):** the stable NoteFlow product foundation—note management, retrieval-first learning, goal controls, authentication, D1 persistence, and the deterministic Flow Engine.
+- **[`codex/all-things-agentic-hackathon`](https://github.com/Dollars7/NoteFlow/tree/codex/all-things-agentic-hackathon):** the separate 2026 All Things Agentic Hackathon entry, with the bilingual public judging flow, Gemini 3.5 Flash, Google ADK, Cloud Run, Firestore, Pub/Sub, and a direct Agent-to-practice handoff.
+
+The branch boundary preserves the earlier product history and keeps contest-period claims auditable. The hackathon branch includes its own [judge README](https://github.com/Dollars7/NoteFlow/blob/codex/all-things-agentic-hackathon/README.md), [pre-existing work disclosure](https://github.com/Dollars7/NoteFlow/blob/codex/all-things-agentic-hackathon/HACKATHON_DISCLOSURE.md), and [dated development log](https://github.com/Dollars7/NoteFlow/blob/codex/all-things-agentic-hackathon/HACKATHON_DEVLOG.md).
+
 The app now has two explicit workspaces:
 
 - **笔记库:** create, search, import, tag, batch-manage, and edit the knowledge objects
